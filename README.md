@@ -1,15 +1,18 @@
 # Toolkit - System Status Monitor
 
+
 <p align="center">
-  <img src="https://img.shields.io/badge/Status-Active-success?style=flat-square" alt="Status" />
-  <img src="https://img.shields.io/badge/License-MIT-blue?style=flat-square" alt="License" />
-  <img src="https://img.shields.io/badge/Platform-Windows-blue?style=flat-square" alt="Platform" />
+    <img src="https://img.shields.io/badge/Status-Active-success?style=flat-square" alt="Status" />
+    <img src="https://img.shields.io/badge/License-MIT-blue?style=flat-square" alt="License" />
+    <img src="https://img.shields.io/badge/Platform-Windows-blue?style=flat-square" alt="Platform" />
 </p>
 
 **Toolkit** is a lightweight, high-aesthetic system status monitor for Windows, built with **Tauri**, **React**, and **Rust**.
 
 Inspired by Material You design principles, it provides a beautiful, transparent, and always-on-top floating window to keep track of your system's vital statistics without cluttering your workspace.
-
+<p align="center">
+    <img src="Test.png" alt="Toolkit Intro" style="max-width:720px; width:80%; height:auto; border-radius:12px; box-shadow:0 12px 30px rgba(0,0,0,0.35);" />
+</p>
 ## ✨ Features
 
 *   **Real-time Monitoring**:
