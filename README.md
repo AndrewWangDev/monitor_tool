@@ -11,7 +11,7 @@
 
 Inspired by Material You design principles, it provides a beautiful, transparent, and always-on-top floating window to keep track of your system's vital statistics without cluttering your workspace.
 <p align="center">
-    <img src="Test.png" alt="Toolkit Intro" style="max-width:720px; width:80%; height:auto; border-radius:12px; box-shadow:0 12px 30px rgba(0,0,0,0.35);" />
+    <img src="Test.png" alt="Toolkit Intro" style="width:400px; height:auto; border-radius:12px; box-shadow:0 12px 30px rgba(0,0,0,0.35);" />
 </p>
 ## ✨ Features
 
