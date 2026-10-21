@@ -1,3 +1,5 @@
+@import "tailwindcss";
+
 :root {
   /* Core Colors - Light Mode Default */
   --md-sys-color-primary: #006c4c;
@@ -63,7 +65,6 @@ html {
   width: 100%;
   display: flex;
   padding: 0;
-  /* Remove padding for now to simplify hit testing */
   background: transparent;
 }
 
@@ -89,9 +90,7 @@ html {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  /* Controls on right */
   padding: 0 16px;
-  /* cursor: move; Handled by data-tauri-drag-region */
 }
 
 .content {
@@ -144,10 +143,25 @@ html {
 /* Components */
 .card-metric {
   background-color: rgba(255, 255, 255, 0.05);
-  /* Subtle overlay */
   border-radius: var(--shape-corner-medium);
   padding: 12px;
   display: flex;
   align-items: center;
   gap: 12px;
+}
+
+/* Settings Overlay Animation */
+.settings-overlay {
+  animation: slideInDown 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes slideInDown {
+  from {
+    transform: translateY(-8px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
 }
