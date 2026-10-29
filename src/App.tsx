@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import "./App.css";
-import { Activity, Wifi, Battery, GripHorizontal, Settings, X, Minus } from "lucide-react";
-import { getCurrentWindow } from "@tauri-apps/api/window";
+import { Activity, Wifi, Battery, GripHorizontal, Settings, X, Minus, MemoryStick } from "lucide-react";
+import { getCurrentWindow, LogicalSize } from "@tauri-apps/api/window";
 import { invoke } from "@tauri-apps/api/core";
 import clsx from "clsx";
 
@@ -11,6 +11,9 @@ interface SystemMetrics {
   used_memory: number;
   total_rx: number;
   total_tx: number;
+  battery_available: boolean;
+  battery_level: number;
+  is_charging: boolean;
 }
 
 interface VisibleMetricsState {
@@ -21,6 +24,17 @@ interface VisibleMetricsState {
 }
 
 const STORAGE_KEY_METRICS = "toolkit_visible_metrics";
+
+// DEF-02: Safe byte formatting with lower and upper bound clamps to prevent underflow
+const formatBytes = (bytes: number) => {
+  if (isNaN(bytes) || bytes < 1) return "0 B";
+  const k = 1024;
+  const sizes = ["B", "KB", "MB", "GB", "TB"];
+  const i = Math.max(0, Math.min(Math.floor(Math.log(bytes) / Math.log(k)), sizes.length - 1));
+  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
+};
+
+const formatSpeed = (bytes: number) => `${formatBytes(bytes)}/s`;
 
 function App() {
   const [isHovered, setIsHovered] = useState(false);
@@ -54,17 +68,6 @@ function App() {
   }, [visibleMetrics]);
 
   // Window control handlers
-  const handleStartDrag = async (e: React.MouseEvent) => {
-    // Only drag with left mouse button
-    if (e.button === 0) {
-      try {
-        await getCurrentWindow().startDragging();
-      } catch (err) {
-        console.error("Window drag error", err);
-      }
-    }
-  };
-
   const handleMinimize = async () => {
     try {
       await getCurrentWindow().minimize();
@@ -83,7 +86,6 @@ function App() {
 
   const [metrics, setMetrics] = useState<SystemMetrics | null>(null);
   const [networkSpeed, setNetworkSpeed] = useState({ rx: 0, tx: 0 }); // Bytes per sec
-  const [battery, setBattery] = useState({ level: 100, charging: false, available: false });
 
   // Use ref to track previous metrics and timestamp without causing re-renders
   const prevMetricsRef = useRef<{ rx: number; tx: number; time: number } | null>(null);
@@ -98,6 +100,20 @@ function App() {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
+
+  // DEF-07: Dynamically adjust window height based on active cards
+  useEffect(() => {
+    const activeCards = [
+      visibleMetrics.cpu,
+      visibleMetrics.ram,
+      visibleMetrics.network,
+      visibleMetrics.battery && metrics?.battery_available,
+    ].filter(Boolean).length;
+
+    // Base height: 56px (header) + 20px (footer) + per-card 66px
+    const targetHeight = Math.max(140, 76 + (activeCards === 0 ? 1 : activeCards) * 66);
+    getCurrentWindow().setSize(new LogicalSize(300, targetHeight)).catch(() => {});
+  }, [visibleMetrics, metrics?.battery_available]);
 
   // Fetch Metrics Loop
   useEffect(() => {
@@ -141,73 +157,29 @@ function App() {
     };
   }, []);
 
-  // Battery Monitor with race condition guard
-  useEffect(() => {
-    let isMounted = true;
-    let batteryApi: any = null;
-
-    const updateBattery = () => {
-      if (isMounted && batteryApi) {
-        setBattery({
-          level: Math.round(batteryApi.level * 100),
-          charging: batteryApi.charging,
-          available: true,
-        });
-      }
-    };
-
-    if (typeof navigator !== "undefined" && "getBattery" in navigator) {
-      (navigator as any)
-        .getBattery()
-        .then((b: any) => {
-          if (!isMounted) return;
-          batteryApi = b;
-          updateBattery();
-          b.addEventListener("levelchange", updateBattery);
-          b.addEventListener("chargingchange", updateBattery);
-        })
-        .catch(() => {
-          // Battery API unsupported or restricted
-        });
-    }
-
-    return () => {
-      isMounted = false;
-      if (batteryApi) {
-        batteryApi.removeEventListener("levelchange", updateBattery);
-        batteryApi.removeEventListener("chargingchange", updateBattery);
-      }
-    };
-  }, []);
-
-  // Safe byte formatting with domain check
-  const formatBytes = (bytes: number) => {
-    if (isNaN(bytes) || bytes <= 0) return "0 B";
-    const k = 1024;
-    const sizes = ["B", "KB", "MB", "GB", "TB"];
-    const i = Math.min(Math.floor(Math.log(bytes) / Math.log(k)), sizes.length - 1);
-    return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
-  };
-
-  const formatSpeed = (bytes: number) => `${formatBytes(bytes)}/s`;
+  const hasAnyVisibleCard =
+    visibleMetrics.cpu ||
+    visibleMetrics.ram ||
+    visibleMetrics.network ||
+    (visibleMetrics.battery && metrics?.battery_available);
 
   return (
     <div className="app-container">
-      {/* Title Bar / Drag Region */}
+      {/* DEF-06: Title Bar / Drag Region separated from interactive buttons */}
       <div
         className="title-bar"
-        data-tauri-drag-region
-        onMouseDown={handleStartDrag}
-        style={{ cursor: "grab", zIndex: 50 }}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
       >
+        {/* Dedicated native drag spacer */}
+        <div className="flex-1 h-full" data-tauri-drag-region style={{ cursor: "grab" }} />
+
+        {/* Action buttons (non-draggable to prevent click interception) */}
         <div
           className={clsx(
-            "flex items-center gap-2 transition-opacity duration-200",
+            "flex items-center gap-2 transition-opacity duration-200 z-10",
             isHovered || showSettings ? "opacity-100" : "opacity-0"
           )}
-          onMouseDown={(e) => e.stopPropagation()} // Prevent window drag when clicking controls
         >
           <button
             type="button"
@@ -296,29 +268,20 @@ function App() {
             <Activity size={24} style={{ color: "var(--md-sys-color-primary)" }} />
             <div className="flex-1">
               <div className="text-label">CPU Usage</div>
-              <div className="text-headline">
+              <div className="text-headline tabular-nums">
                 {metrics ? Math.round(metrics.cpu_usage) : 0}%
               </div>
             </div>
           </div>
         )}
 
-        {/* RAM Monitor */}
+        {/* RAM Monitor (DEF-08: Replaced plain text 'R' with MemoryStick icon) */}
         {visibleMetrics.ram && (
           <div className="card-metric">
-            {/* Custom Icon for RAM */}
-            <div
-              className="w-6 h-6 rounded border-2 flex items-center justify-center text-[10px] font-bold"
-              style={{
-                borderColor: "var(--md-sys-color-primary)",
-                color: "var(--md-sys-color-primary)",
-              }}
-            >
-              R
-            </div>
+            <MemoryStick size={24} style={{ color: "var(--md-sys-color-primary)" }} />
             <div className="flex-1">
               <div className="text-label">Memory</div>
-              <div className="text-headline">
+              <div className="text-headline tabular-nums">
                 {metrics && metrics.total_memory > 0
                   ? Math.round((metrics.used_memory / metrics.total_memory) * 100)
                   : 0}
@@ -331,13 +294,13 @@ function App() {
           </div>
         )}
 
-        {/* Network Monitor */}
+        {/* Network Monitor (DEF-08: font-mono tabular-nums to prevent text jitter) */}
         {visibleMetrics.network && (
           <div className="card-metric">
             <Wifi size={24} style={{ color: "var(--md-sys-color-primary)" }} />
             <div className="flex-1">
               <div className="text-label">Network</div>
-              <div className="text-body flex justify-between text-xs">
+              <div className="text-body flex justify-between text-xs font-mono tabular-nums">
                 <span>↓ {formatSpeed(networkSpeed.rx)}</span>
                 <span className="opacity-60">↑ {formatSpeed(networkSpeed.tx)}</span>
               </div>
@@ -345,28 +308,34 @@ function App() {
           </div>
         )}
 
-        {/* Battery Monitor (Conditional) */}
-        {visibleMetrics.battery && battery.available && (
+        {/* Battery Monitor (DEF-03: Powered by native Windows power API) */}
+        {visibleMetrics.battery && metrics?.battery_available && (
           <div className="card-metric">
             <Battery size={24} style={{ color: "var(--md-sys-color-primary)" }} />
             <div className="flex-1">
               <div className="text-label">
-                Battery {battery.charging ? "(Charging)" : ""}
+                Battery {metrics.is_charging ? "(Charging)" : ""}
               </div>
-              <div className="text-headline">{battery.level}%</div>
+              <div className="text-headline tabular-nums">{metrics.battery_level}%</div>
             </div>
+          </div>
+        )}
+
+        {/* Empty state when all metrics are disabled */}
+        {!hasAnyVisibleCard && (
+          <div className="py-4 text-center text-xs opacity-50 select-none">
+            All monitors hidden. Open settings to enable.
           </div>
         )}
       </div>
 
       {/* Footer / Drag Handle */}
       <div
-        className="h-5 w-full flex justify-center items-center opacity-30 hover:opacity-60 transition-opacity"
+        className="h-4 w-full flex justify-center items-center opacity-30 hover:opacity-60 transition-opacity"
         data-tauri-drag-region
-        onMouseDown={handleStartDrag}
         style={{ cursor: "grab" }}
       >
-        <GripHorizontal size={16} />
+        <GripHorizontal size={14} />
       </div>
     </div>
   );
