@@ -15,7 +15,7 @@
         "label": "main",
         "title": "Toolkit",
         "width": 300,
-        "height": 450,
+        "height": 340,
         "decorations": false,
         "transparent": true,
         "alwaysOnTop": true,
