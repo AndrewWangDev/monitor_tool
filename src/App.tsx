@@ -1,8 +1,10 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import "./App.css";
 import { Activity, Wifi, Battery, GripHorizontal, Settings, X, Minus, MemoryStick } from "lucide-react";
 import { getCurrentWindow, LogicalSize } from "@tauri-apps/api/window";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
+import { enable, disable, isEnabled } from "@tauri-apps/plugin-autostart";
 import clsx from "clsx";
 
 interface SystemMetrics {
@@ -11,6 +13,8 @@ interface SystemMetrics {
   used_memory: number;
   total_rx: number;
   total_tx: number;
+  rx_speed: number;
+  tx_speed: number;
   battery_available: boolean;
   battery_level: number;
   is_charging: boolean;
@@ -85,10 +89,25 @@ function App() {
   };
 
   const [metrics, setMetrics] = useState<SystemMetrics | null>(null);
-  const [networkSpeed, setNetworkSpeed] = useState({ rx: 0, tx: 0 }); // Bytes per sec
+  const [autostart, setAutostart] = useState(false);
 
-  // Use ref to track previous metrics and timestamp without causing re-renders
-  const prevMetricsRef = useRef<{ rx: number; tx: number; time: number } | null>(null);
+  // Initialize autostart status
+  useEffect(() => {
+    isEnabled().then(setAutostart).catch(() => {});
+  }, []);
+
+  const handleToggleAutostart = async (checked: boolean) => {
+    try {
+      if (checked) {
+        await enable();
+      } else {
+        await disable();
+      }
+      setAutostart(checked);
+    } catch (err) {
+      console.error("Failed to toggle autostart:", err);
+    }
+  };
 
   // Keyboard shortcut: Escape closes settings
   useEffect(() => {
@@ -112,53 +131,40 @@ function App() {
 
     // Base height: 56px (header) + 20px (footer) + per-card 66px
     const contentHeight = 76 + (activeCards === 0 ? 1 : activeCards) * 66;
-    // When settings is open, ensure at least 260px safe height so all checkboxes are accessible
+    // When settings is open, ensure at least 295px safe height so all checkboxes (including autostart) are accessible
     const targetHeight = showSettings
-      ? Math.max(contentHeight, 260)
+      ? Math.max(contentHeight, 295)
       : Math.max(140, contentHeight);
 
     getCurrentWindow().setSize(new LogicalSize(300, targetHeight)).catch(() => {});
   }, [visibleMetrics, metrics?.battery_available, showSettings]);
 
-  // Fetch Metrics Loop
+  // Event-Driven Metrics Streaming
   useEffect(() => {
     let isCancelled = false;
+    let unlisten: (() => void) | undefined;
 
-    const fetchMetrics = async () => {
-      try {
-        const data: SystemMetrics = await invoke("get_metrics");
-        if (isCancelled) return;
+    // Fetch initial frame immediately
+    invoke<SystemMetrics>("get_metrics")
+      .then((data) => {
+        if (!isCancelled) setMetrics(data);
+      })
+      .catch((err) => console.error("Initial metrics fetch error", err));
 
-        const now = performance.now();
-        if (prevMetricsRef.current) {
-          const deltaSec = (now - prevMetricsRef.current.time) / 1000;
-          if (deltaSec > 0) {
-            const rxDiff = data.total_rx - prevMetricsRef.current.rx;
-            const txDiff = data.total_tx - prevMetricsRef.current.tx;
-            setNetworkSpeed({
-              rx: rxDiff >= 0 ? Math.round(rxDiff / deltaSec) : 0,
-              tx: txDiff >= 0 ? Math.round(txDiff / deltaSec) : 0,
-            });
-          }
-        }
-
-        prevMetricsRef.current = {
-          rx: data.total_rx,
-          tx: data.total_tx,
-          time: now,
-        };
-
-        setMetrics(data);
-      } catch (e) {
-        console.error("Failed to fetch metrics", e);
+    // Listen to backend pushed metrics stream
+    listen<SystemMetrics>("sys://metrics", (event) => {
+      if (!isCancelled) {
+        setMetrics(event.payload);
       }
-    };
+    })
+      .then((dispose) => {
+        unlisten = dispose;
+      })
+      .catch((err) => console.error("Listen metrics error", err));
 
-    const interval = setInterval(fetchMetrics, 1000);
-    fetchMetrics(); // Initial call
     return () => {
       isCancelled = true;
-      clearInterval(interval);
+      if (unlisten) unlisten();
     };
   }, []);
 
@@ -262,6 +268,16 @@ function App() {
               />
               <span className="text-body text-sm">Battery</span>
             </label>
+            <div className="pt-2 mt-0.5 border-t border-[var(--md-sys-color-outline)]/20">
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={autostart}
+                  onChange={(e) => handleToggleAutostart(e.target.checked)}
+                />
+                <span className="text-body text-sm">Launch on Startup</span>
+              </label>
+            </div>
           </div>
         </div>
       )}
@@ -306,8 +322,8 @@ function App() {
             <div className="flex-1">
               <div className="text-label">Network</div>
               <div className="text-body flex justify-between text-xs font-mono tabular-nums">
-                <span>↓ {formatSpeed(networkSpeed.rx)}</span>
-                <span className="opacity-60">↑ {formatSpeed(networkSpeed.tx)}</span>
+                <span>↓ {formatSpeed(metrics?.rx_speed ?? 0)}</span>
+                <span className="opacity-60">↑ {formatSpeed(metrics?.tx_speed ?? 0)}</span>
               </div>
             </div>
           </div>
