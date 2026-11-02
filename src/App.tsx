@@ -158,7 +158,11 @@ function App() {
       }
     })
       .then((dispose) => {
-        unlisten = dispose;
+        if (isCancelled) {
+          dispose();
+        } else {
+          unlisten = dispose;
+        }
       })
       .catch((err) => console.error("Listen metrics error", err));
 
