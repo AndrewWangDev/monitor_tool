@@ -1,8 +1,9 @@
 use sysinfo::{CpuRefreshKind, MemoryRefreshKind, Networks, RefreshKind, System};
 use std::sync::Mutex;
-use tauri::{Manager, State};
+use tauri::{Emitter, Manager, State};
 use tauri::tray::{TrayIconBuilder, MouseButton, MouseButtonState, TrayIconEvent};
 use tauri::menu::{Menu, MenuItem};
+use tauri_plugin_window_state::{Builder as WindowStateBuilder, StateFlags};
 use serde::Serialize;
 
 #[derive(Serialize, Clone)]
@@ -12,6 +13,8 @@ pub struct SystemMetrics {
     pub used_memory: u64,
     pub total_rx: u64,
     pub total_tx: u64,
+    pub rx_speed: u64,
+    pub tx_speed: u64,
     pub battery_available: bool,
     pub battery_level: u8,
     pub is_charging: bool,
@@ -101,6 +104,8 @@ fn get_metrics(state: State<AppState>) -> SystemMetrics {
         used_memory,
         total_rx,
         total_tx,
+        rx_speed: 0,
+        tx_speed: 0,
         battery_available,
         battery_level,
         is_charging,
@@ -110,6 +115,15 @@ fn get_metrics(state: State<AppState>) -> SystemMetrics {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(
+            WindowStateBuilder::default()
+                .with_state_flags(StateFlags::POSITION)
+                .build(),
+        )
+        .plugin(tauri_plugin_autostart::init(
+            tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+            Some(vec!["--autostart"]),
+        ))
         .setup(|app| {
             // Precise initialization to avoid scanning processes, disks, users on cold start
             let sys = System::new_with_specifics(
@@ -170,6 +184,79 @@ pub fn run() {
                 tray_builder = tray_builder.icon(icon.clone());
             }
             let _ = tray_builder.build(app);
+
+            // Background event-driven metrics streaming
+            let app_handle = app.handle().clone();
+            std::thread::spawn(move || {
+                let mut last_instant = std::time::Instant::now();
+                let mut last_rx: u64 = 0;
+                let mut last_tx: u64 = 0;
+                let mut is_first = true;
+
+                loop {
+                    std::thread::sleep(std::time::Duration::from_secs(1));
+
+                    let state = app_handle.state::<AppState>();
+                    let mut sys = state.system.lock().unwrap_or_else(|e| e.into_inner());
+                    let mut networks = state.networks.lock().unwrap_or_else(|e| e.into_inner());
+
+                    sys.refresh_cpu_specifics(CpuRefreshKind::nothing().with_cpu_usage());
+                    sys.refresh_memory();
+                    networks.refresh(true);
+
+                    let cpu_usage = sys.global_cpu_usage();
+                    let total_memory = sys.total_memory();
+                    let used_memory = sys.used_memory();
+
+                    let (total_rx, total_tx) = networks.iter().filter(|(name, _)| {
+                        let n = name.to_lowercase();
+                        !n.contains("loopback")
+                            && !n.starts_with("lo")
+                            && !n.contains("vethernet")
+                            && !n.contains("virtual")
+                            && !n.contains("vmware")
+                            && !n.contains("docker")
+                    }).fold((0, 0), |acc, (_, data)| {
+                        (acc.0 + data.total_received(), acc.1 + data.total_transmitted())
+                    });
+
+                    let now = std::time::Instant::now();
+                    let elapsed = now.duration_since(last_instant).as_secs_f64();
+                    last_instant = now;
+
+                    let (rx_speed, tx_speed) = if is_first {
+                        is_first = false;
+                        last_rx = total_rx;
+                        last_tx = total_tx;
+                        (0, 0)
+                    } else if elapsed > 0.0 {
+                        let rx_diff = total_rx.saturating_sub(last_rx);
+                        let tx_diff = total_tx.saturating_sub(last_tx);
+                        last_rx = total_rx;
+                        last_tx = total_tx;
+                        ((rx_diff as f64 / elapsed).round() as u64, (tx_diff as f64 / elapsed).round() as u64)
+                    } else {
+                        (0, 0)
+                    };
+
+                    let (battery_available, battery_level, is_charging) = get_native_battery_status();
+
+                    let metrics = SystemMetrics {
+                        cpu_usage,
+                        total_memory,
+                        used_memory,
+                        total_rx,
+                        total_tx,
+                        rx_speed,
+                        tx_speed,
+                        battery_available,
+                        battery_level,
+                        is_charging,
+                    };
+
+                    let _ = app_handle.emit("sys://metrics", &metrics);
+                }
+            });
 
             Ok(())
         })
