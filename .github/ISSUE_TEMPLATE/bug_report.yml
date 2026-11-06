@@ -1,0 +1,62 @@
+name: 🐛 Bug Report
+description: Create a report to help us improve Toolkit
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for reporting an issue! Please search existing issues first to avoid duplicates.
+        *If you are reporting a security vulnerability, please do NOT use this form; refer to our [Security Policy](https://github.com/AndrewWangDev/monitor_tool/security/policy) instead.*
+  - type: input
+    id: version
+    attributes:
+      label: Toolkit Version
+      description: What version of Toolkit are you running? (e.g. 0.2.0 or commit hash)
+      placeholder: "0.2.0"
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating System
+      description: Which Windows version are you using?
+      options:
+        - "Windows 11 (64-bit)"
+        - "Windows 10 (64-bit)"
+        - "Other / Insider Preview"
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug Description
+      description: A clear and concise description of what the bug is.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to Reproduce
+      description: Step-by-step instructions to reproduce the issue.
+      placeholder: |
+        1. Launch Toolkit
+        2. Drag window to secondary display
+        3. Click Settings
+        4. Observe behavior
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: A clear description of what you expected to happen.
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs & Screenshots
+      description: Paste any terminal logs or drag and drop screenshots/screen recordings here.
+    validations:
+      required: false
