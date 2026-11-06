@@ -1,0 +1,16 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Capability for the main window",
+  "windows": [
+    "main"
+  ],
+  "permissions": [
+    "core:default",
+    "opener:default",
+    "core:window:allow-start-dragging",
+    "core:window:allow-set-decorations",
+    "core:window:allow-set-shadow",
+    "core:window:allow-set-always-on-top"
+  ]
+}

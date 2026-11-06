@@ -1,0 +1,153 @@
+:root {
+  /* Core Colors - Light Mode Default */
+  --md-sys-color-primary: #006c4c;
+  --md-sys-color-on-primary: #ffffff;
+  --md-sys-color-primary-container: #89f8c7;
+  --md-sys-color-on-primary-container: #002114;
+
+  --md-sys-color-surface: #fbfdf9;
+  --md-sys-color-on-surface: #191c1a;
+  --md-sys-color-surface-variant: #dbe5de;
+  --md-sys-color-on-surface-variant: #404944;
+
+  --md-sys-color-outline: #707974;
+
+  /* Typography */
+  --font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+
+  /* Shapes */
+  --shape-corner-large: 24px;
+  --shape-corner-medium: 12px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    /* Core Colors - Dark Mode */
+    --md-sys-color-primary: #6dddaac0;
+    --md-sys-color-on-primary: #003825;
+    --md-sys-color-primary-container: #005138;
+    --md-sys-color-on-primary-container: #89f8c7;
+
+    --md-sys-color-surface: #191c1ade;
+    /* Slightly transparent for acrylic feel */
+    --md-sys-color-on-surface: #e1e3df;
+    --md-sys-color-surface-variant: #404944;
+    --md-sys-color-on-surface-variant: #bfc9c2;
+
+    --md-sys-color-outline: #89938d;
+  }
+}
+
+* {
+  box-sizing: border-box;
+  user-select: none;
+  /* App-like feel */
+  -webkit-font-smoothing: antialiased;
+}
+
+body,
+html {
+  margin: 0;
+  padding: 0;
+  height: 100vh;
+  width: 100vw;
+  background: transparent !important;
+  /* Force transparent */
+  font-family: var(--font-family);
+  overflow: hidden;
+  /* No scrollbars on main window */
+}
+
+#root {
+  height: 100%;
+  width: 100%;
+  display: flex;
+  padding: 0;
+  /* Remove padding for now to simplify hit testing */
+  background: transparent;
+}
+
+.app-container {
+  flex: 1;
+  background-color: var(--md-sys-color-surface);
+  color: var(--md-sys-color-on-surface);
+  border-radius: var(--shape-corner-large);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+  /* Border for contrast in dark mode */
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  position: relative;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Drag Region */
+.title-bar {
+  height: 32px;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  /* Controls on right */
+  padding: 0 16px;
+  /* cursor: move; Handled by data-tauri-drag-region */
+}
+
+.content {
+  flex: 1;
+  padding: 0 16px 16px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow-y: auto;
+}
+
+/* Scrollbar styling */
+.content::-webkit-scrollbar {
+  width: 4px;
+}
+
+.content::-webkit-scrollbar-thumb {
+  background-color: var(--md-sys-color-surface-variant);
+  border-radius: 4px;
+}
+
+/* Typography Utilities */
+.text-display {
+  font-size: 32px;
+  font-weight: 400;
+}
+
+.text-headline {
+  font-size: 24px;
+  font-weight: 500;
+}
+
+.text-body {
+  font-size: 14px;
+  font-weight: 400;
+  letter-spacing: 0.25px;
+}
+
+.text-label {
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+  opacity: 0.8;
+}
+
+.text-primary {
+  color: var(--md-sys-color-primary);
+}
+
+/* Components */
+.card-metric {
+  background-color: rgba(255, 255, 255, 0.05);
+  /* Subtle overlay */
+  border-radius: var(--shape-corner-medium);
+  padding: 12px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
