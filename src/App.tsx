@@ -78,9 +78,9 @@ function App() {
 
   const handleClose = async () => {
     try {
-      await getCurrentWindow().close();
+      await getCurrentWindow().hide();
     } catch (err) {
-      console.error("Window close error", err);
+      console.error("Window hide error", err);
     }
   };
 
@@ -101,7 +101,7 @@ function App() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
-  // DEF-07: Dynamically adjust window height based on active cards
+  // DEF-07 & NEW-01: Dynamically adjust window height based on active cards and settings visibility
   useEffect(() => {
     const activeCards = [
       visibleMetrics.cpu,
@@ -111,9 +111,14 @@ function App() {
     ].filter(Boolean).length;
 
     // Base height: 56px (header) + 20px (footer) + per-card 66px
-    const targetHeight = Math.max(140, 76 + (activeCards === 0 ? 1 : activeCards) * 66);
+    const contentHeight = 76 + (activeCards === 0 ? 1 : activeCards) * 66;
+    // When settings is open, ensure at least 260px safe height so all checkboxes are accessible
+    const targetHeight = showSettings
+      ? Math.max(contentHeight, 260)
+      : Math.max(140, contentHeight);
+
     getCurrentWindow().setSize(new LogicalSize(300, targetHeight)).catch(() => {});
-  }, [visibleMetrics, metrics?.battery_available]);
+  }, [visibleMetrics, metrics?.battery_available, showSettings]);
 
   // Fetch Metrics Loop
   useEffect(() => {
